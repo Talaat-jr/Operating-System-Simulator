@@ -209,7 +209,8 @@ void push_to_ready_queue(ProcessNeededInformation *process)
 
 void add_ready_processes()
 {
-    for (int i = 0; i < scheduler_queue.ready_queue.count; i++)
+    int ready_queue_size = scheduler_queue.ready_queue.count;
+    for (int i = 0; i < ready_queue_size; i++)
     {
         ProcessNeededInformation *process = dequeue(&(scheduler_queue.ready_queue));
         int priority_level = to_int(process->priority->value);
@@ -264,6 +265,12 @@ void print_PNI(ProcessNeededInformation *process)
 
 void print_MLFQ()
 {
+    printf("----------------------------------- Ready Queue ---------------------------------\n");
+    for (int i = 0; i < scheduler_queue.ready_queue.count; i++)
+    {
+        print_PNI(scheduler_queue.ready_queue.processes[i]);
+    }
+    printf("--------------------------------------------------------------------------------\n");
 
     for (int i = 0; i < NUM_QUEUES; i++)
     {
