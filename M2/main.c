@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define PCB_SIZE 6
+#define NUM_VARIABLES_PER_PROCESS 3
 
-// For parsing the program text file
 char **read_program(const char *filename, int *num_lines)
 {
     FILE *file = fopen(filename, "r");
@@ -53,7 +53,9 @@ char **read_program(const char *filename, int *num_lines)
             free(lines);
             return NULL;
         }
-
+        // removing the new line character
+        if (line[strlen(line) - 1] == '\n')
+            line[strlen(line) - 1] = '\0';
         strcpy(lines[num_allocated_lines], line);
         num_allocated_lines++;
     }
@@ -176,27 +178,59 @@ void init_PCB(Memory *memory, int process_id)
         memory->cells[(memory->number_of_populated_cells)++] = pcb[i];
 }
 
+void init_variables_section(Memory *memory)
+{
+    for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
+        (memory->number_of_populated_cells)++;
+}
+
+void init_process_instructoins(Memory *memory, char *program_file_path)
+{
+    int num_lines;
+    char **lines = read_program(program_file_path, &num_lines);
+    if (lines == NULL)
+    {
+        printf("Error reading program file\n");
+        return;
+    }
+
+    for (int i = 0; i < num_lines; i++)
+    {
+        char *instructoin_number = malloc(10 * sizeof(char));
+        char *instruction = malloc((strlen(lines[i]) + 5) * sizeof(char));
+        sprintf(instructoin_number, "Inst_%d", i);
+        sprintf(instruction, "%s", lines[i]);
+
+        memory->cells[(memory->number_of_populated_cells)++] = (Pair){instructoin_number, instruction};
+    }
+
+    clear_buffer(lines, num_lines);
+}
+
 void add_process(Memory *memory, char *program_file_path, int process_id, int clk)
 {
     init_PCB(memory, process_id);
+    init_variables_section(memory);
+    init_process_instructoins(memory, program_file_path);
 }
 
 void print_mem(Memory *memory)
 {
-    for (int i = 0; i < memory->number_of_populated_cells; i++)
+    for (int i = 0; i < 60; i++)
     {
         printf("%s: %s\n", (memory->cells[i]).name, (memory->cells[i]).value);
     }
 }
+
+Memory memory; // globally defined to be automatically initialized
 
 void main()
 {
 
     int processs_id = 0;
 
-    Memory memory;
-    memory.number_of_populated_cells = 0;
-
-    add_process(&memory, "program.txt", processs_id, 0);
+    add_process(&memory, "Program_1.txt", processs_id++, 0);
+    add_process(&memory, "Program_2.txt", processs_id++, 0);
+    add_process(&memory, "Program_3.txt", processs_id++, 0);
     print_mem(&memory);
 }
