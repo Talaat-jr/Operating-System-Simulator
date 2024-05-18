@@ -165,6 +165,7 @@ typedef struct
     Pair *state;
     Pair *priority;
     Pair *start_of_variables_section;
+    Pair *upper_bound;
 } ProcessNeededInformation;
 
 typedef struct
@@ -235,20 +236,43 @@ ProcessNeededInformation *get_highest_priority_process(int *quantum)
 ProcessNeededInformation *pull_executable_process()
 {
     add_ready_processes();
+    int pc_val;
+    int upper_bound;
     if (scheduler_queue.quantum == 0)
     {
         if (scheduler_queue.running_process != NULL)
         {
-            scheduler_queue.running_process->priority->value = to_string(to_int(scheduler_queue.running_process->priority->value) + 1);
+            pc_val = to_int((scheduler_queue.running_process->pc->value));
+            upper_bound = to_int((scheduler_queue.running_process->upper_bound->value));
+            if(pc_val <= upper_bound){
+                int priority_level = to_int(scheduler_queue.running_process->priority->value);
+                if(priority_level < 3){
+                    scheduler_queue.running_process->priority->value = to_string(to_int(scheduler_queue.running_process->priority->value) + 1);
+                    priority_level++;
+                }    
+                enqueue(&(scheduler_queue.level_queues[priority_level]), scheduler_queue.running_process);
+            }
         }
 
         scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
+        scheduler_queue.quantum--;
+        return scheduler_queue.running_process;
     }
     else
     {
-        if (strcmp(scheduler_queue.running_process->state->value, "blocked") == 0)
-        {
+        pc_val = to_int((scheduler_queue.running_process->pc->value));
+        upper_bound = to_int((scheduler_queue.running_process->upper_bound->value));
+        if(pc_val > upper_bound){
             scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
+            scheduler_queue.quantum--;
+            return scheduler_queue.running_process;
+        }
+        if (strcmp(scheduler_queue.running_process->state->value, "Blocked") == 0)
+        {
+            print_PNI(scheduler_queue.running_process);
+            scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
+            scheduler_queue.quantum--;
+            return scheduler_queue.running_process;
         }
         else
         {
@@ -261,6 +285,9 @@ void print_PNI(ProcessNeededInformation *process)
 {
     printf("Process ID : %s\n", process->pid->value);
     printf("Priority: %s\n", process->priority->value);
+    printf("State: %s\n", process->state->value);
+    printf("PC: %s\n", process->pc->value);
+    printf("Upper Bound: %s\n", process->upper_bound->value);
 }
 
 void print_MLFQ()
@@ -285,13 +312,26 @@ void print_MLFQ()
         }
         printf("--------------------------------------------------------------------------------\n");
     }
+    printf("------------------------------------- Running Process -------------------------------\n");
+    if (scheduler_queue.running_process != NULL)
+    {
+        print_PNI(scheduler_queue.running_process);
+    }
+    printf("Quantum : %i\n" ,scheduler_queue.quantum);
+    printf("--------------------------------------------------------------------------------\n");
 }
 
 void init_PCB(int process_id, ProcessNeededInformation *process)
 {
 
     process->pid = &memory.cells[(memory.number_of_populated_cells)];
+    process->state = &memory.cells[(memory.number_of_populated_cells) + 1];
     process->priority = &memory.cells[(memory.number_of_populated_cells) + 2];
+    process->pc = &memory.cells[(memory.number_of_populated_cells) + 3];
+    process->upper_bound = &memory.cells[(memory.number_of_populated_cells) + 5];
+    // process->state = malloc(sizeof(Pair));
+    // process->state->name = "State";
+    // process->state->value = "Ready";
 
     Pair pcb[PCB_SIZE] =
         {
@@ -304,6 +344,7 @@ void init_PCB(int process_id, ProcessNeededInformation *process)
 
     for (int i = 0; i < PCB_SIZE; i++)
         memory.cells[(memory.number_of_populated_cells)++] = pcb[i];
+    
 }
 
 void init_variables_section()
@@ -358,8 +399,13 @@ void main()
 {
 
     add_process("Program_1.txt", 0, 0);
+    pull_executable_process();
+    pull_executable_process();
+    // pull_executable_process();
+    // add_process("Program_3.txt" , 2, 0);
+    scheduler_queue.running_process->state->value = "Blocked";
     add_process("Program_2.txt", 1, 0);
-    print_mem();
     pull_executable_process();
     print_MLFQ();
+    print_mem();
 }
