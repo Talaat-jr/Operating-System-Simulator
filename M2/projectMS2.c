@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define PCB_SIZE 6
+#define STACK_SIZE 2
 
 // For parsing the program text file
 char **read_program(const char *filename, int *num_lines)
@@ -146,12 +147,6 @@ typedef struct
 
 typedef struct
 {
-    int number_of_populated_cells;
-    Pair cells[60];
-} Memory;
-
-typedef struct
-{
     int pid;
     int arrival_time;
     int number_of_instructions;
@@ -160,6 +155,73 @@ typedef struct
     Pair *priority;
     Pair *start_of_variables_section;
 } ProcessNeededInformation;
+
+typedef struct
+{
+    ProcessNeededInformation *data;
+    struct node *next;
+} node;
+
+typedef struct
+{
+    int count;
+    node *rear;
+    node *front;
+} queue;
+
+queue *General_Queue;
+
+typedef struct
+{
+    int number_of_populated_cells;
+    Pair cells[60];
+} Memory;
+
+typedef struct
+{
+    int file_free;
+    int Process_using;
+    queue *file_Blocked_Queue;
+} file;
+
+typedef struct
+{
+    int userInput_free;
+    int Process_using;
+    queue *userInput_Blocked_Queue;
+} userInput;
+
+typedef struct
+{
+    int userOutput_free;
+    int Process_using;
+    queue *userOutput_Blocked_Queue;
+} userOutput;
+
+file f;
+userInput ui;
+userOutput uo;
+
+void init_resources()
+{
+    f.file_free = 1;
+    f.Process_using = -1;
+    f.file_Blocked_Queue = malloc(sizeof(f.file_Blocked_Queue));
+    create((f.file_Blocked_Queue));
+
+    ui.userInput_free = 1;
+    ui.Process_using = -1;
+    ui.userInput_Blocked_Queue = malloc(sizeof ui.userInput_Blocked_Queue);
+    create(ui.userInput_Blocked_Queue);
+
+    uo.userOutput_free = 1;
+    uo.Process_using = -1;
+    uo.userOutput_Blocked_Queue = malloc(sizeof uo.userOutput_Blocked_Queue);
+    create(uo.userOutput_Blocked_Queue);
+
+    General_Queue = malloc(sizeof General_Queue);
+    create(General_Queue);
+}
 
 void init_PCB(Memory *memory, int process_id)
 {
@@ -189,14 +251,343 @@ void print_mem(Memory *memory)
     }
 }
 
-void main()
+void WriteFile(const char *filename, const char *data)
+{
+    FILE *file;
+    FILE *file2 = fopen(filename, "r");
+    if (file2 != NULL)
+    {
+        printf("This file already exist\n");
+        return NULL;
+    }
+
+    file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        return; // file could not be opened/created
+    }
+
+    fprintf(file, "%s", data);
+
+    fclose(file);
+    return; // file written successfully
+}
+
+void create(queue *q)
+{
+    q->front = NULL;
+    q->rear = NULL;
+    q->count = 0;
+}
+
+int isempty(queue *q)
+{
+    if (q->count == 0)
+        return 1;
+    return 0;
+}
+
+int full(queue *q)
+{
+    if (q->count == STACK_SIZE)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+void enqueue(queue *q, ProcessNeededInformation *x)
+{
+    node *temp;
+    temp = (node *)malloc(sizeof(node));
+
+    temp->data = x;
+    temp->next = NULL;
+
+    if (full(q))
+    {
+        printf("Not possible. Overflow.");
+    }
+    else if (isempty(q))
+    {
+        q->front = q->rear = temp;
+        q->count++;
+    }
+    else
+    {
+        q->rear->next = temp;
+        q->rear = temp;
+        q->count++;
+    }
+}
+
+ProcessNeededInformation *dequeuehelper(queue *q)
+{
+    if (isempty(q))
+    {
+        printf("Not possible. Underflow.");
+        return;
+    }
+    node *p;
+    p = (node *)malloc(sizeof(node));
+    p = q->front;
+
+    q->front = q->front->next;
+    q->count--;
+
+    ProcessNeededInformation *x = (p->data);
+    return x;
+}
+
+ProcessNeededInformation *dequeue(queue *q)
+{
+    int maxPriority = 99;
+    ProcessNeededInformation *temp = NULL;
+
+    for (int i = 0; i < q->count; i++)
+    {
+        temp = dequeuehelper(q);
+
+        if (temp == NULL)
+        {
+            return NULL;
+        }
+
+        if (maxPriority > to_int(temp->priority->value))
+        {
+            maxPriority = to_int(temp->priority->value);
+        }
+        enqueue(q, temp);
+    }
+
+    ProcessNeededInformation *temp2;
+
+    for (int i = 0; i < q->count; i++)
+    {
+        temp2 = dequeuehelper(q);
+        if (to_int(temp2->priority->value) == maxPriority)
+        {
+            return temp2;
+        }
+        enqueue(q, temp2);
+    }
+}
+
+int semWaitFile(ProcessNeededInformation *p)
+{
+    if (f.file_free == 1)
+    {
+        f.Process_using = p->pid;
+        f.file_free = 0;
+        printf("files resource has been locked suceesfully by process: %i \n", p->pid);
+        return 1;
+    }
+    else
+    {
+        p->state->value = "blocked";
+        enqueue(General_Queue, p);
+        enqueue(f.file_Blocked_Queue, p);
+        printf("Request rejected, process:%i has been blcoked as process: %i is currently using the file resource \n", p->pid, f.Process_using);
+        return 0;
+    }
+    return 0;
+}
+
+int semSignalFile(ProcessNeededInformation *p)
+{
+    if (p->pid != f.Process_using)
+    {
+        printf("Rejected as you are not the process that blocked this resource \n");
+        return 0;
+    }
+    else
+    {
+        if (isempty(f.file_Blocked_Queue))
+        {
+            printf("process: %i unlocked the file resource sucessfully. The resource is currently free to use \n", p->pid);
+            f.file_free = 1;
+            f.Process_using = -1;
+            return 1;
+        }
+        else
+        {
+            printf("process: %i unlocked the file resource sucessfully. \n", p->pid);
+            ProcessNeededInformation *temp;
+            temp = dequeue(f.file_Blocked_Queue);
+            // pushToReady(temp);
+            f.Process_using = temp->pid;
+            temp->state->value = "Ready";
+            printf("process: %i is currently using the file resource. \n", temp->pid);
+            return 1;
+        }
+    }
+}
+
+int semWaituserInput(ProcessNeededInformation *p)
+{
+    if (ui.userInput_free)
+    {
+        ui.Process_using = p->pid;
+        ui.userInput_free = 0;
+        printf("Input resource has been locked suceesfully by process: %i \n", p->pid);
+        return 1;
+    }
+
+    p->state->value = "blocked";
+    enqueue(General_Queue, p);
+    enqueue(ui.userInput_Blocked_Queue, p);
+    printf("Request rejected, process: %i has been blcoked as process: %i is currently using the input resource \n", p->pid, ui.Process_using);
+    return 0;
+}
+
+int semSignaluserInput(ProcessNeededInformation *p)
+{
+    if (p->pid != ui.Process_using)
+    {
+        printf("Rejected as you are not the process that blocked this resource \n");
+        return 0;
+    }
+    else
+    {
+        if (isempty(ui.userInput_Blocked_Queue))
+        {
+            printf("process: %i unlocked the input resource sucessfully. The resource is currently free to use \n", p->pid);
+            ui.userInput_free = 1;
+            ui.Process_using = -1;
+            return 1;
+        }
+        else
+        {
+            printf("process: %i unlocked sucessfully.", p->pid);
+            ProcessNeededInformation *temp;
+            temp = dequeue(ui.userInput_Blocked_Queue);
+            // pushToReady(temp);
+            ui.Process_using = temp->pid;
+            temp->state->value = "Ready";
+            printf("process: %i is currently using the user input resource.", temp->pid);
+            return 1;
+        }
+    }
+}
+
+int semWaituserOutput(ProcessNeededInformation *p)
+{
+    if (uo.userOutput_free)
+    {
+        uo.Process_using = p->pid;
+        uo.userOutput_free = 0;
+        printf("Output resource has been locked suceesfully by process: ", p->pid);
+        return 1;
+    }
+    else
+    {
+        p->state->value = "blocked";
+        enqueue(General_Queue, p);
+        enqueue(uo.userOutput_Blocked_Queue, p);
+        printf("Request rejected, process: %i has been blcoked as process: %i is currently using the output resource \n", p->pid, uo.Process_using);
+        return 0;
+    }
+}
+
+int semSignaluserOutput(ProcessNeededInformation *p)
+{
+    if (p->pid != uo.Process_using)
+    {
+        printf("Rejected as you are not the process that blocked this resource \n");
+        return 0;
+    }
+    else
+    {
+        if (isempty(uo.userOutput_Blocked_Queue))
+        {
+            printf("process: %i unlocked the output resource sucessfully. The resource is currently free to use \n", p->pid);
+            uo.userOutput_free = 1;
+            uo.Process_using = -1;
+            return 1;
+        }
+        else
+        {
+            printf("process: %i unlocked sucessfully.", p->pid);
+            ProcessNeededInformation *temp;
+            temp = dequeue(uo.userOutput_Blocked_Queue);
+            // pushToReady(temp);
+            uo.Process_using = temp->pid;
+            temp->state->value = "Ready";
+            printf("process: %i is currently using the user output resource.", temp->pid);
+            return 1;
+        }
+    }
+}
+
+char *takeInput()
+{
+    printf("Enter a value: ");
+    char str[100];
+    scanf(" %[^\n]", str); // Fixing the scanf format string
+
+    // Allocate memory dynamically for the input string
+    char *result = malloc(strlen(str) + 1);
+    if (result != NULL)
+    {
+        strcpy(result, str); // Copy the input to the allocated memory
+    }
+    return result;
+}
+
+void printOutput(char *x)
+{
+    printf("%s", x);
+    return;
+}
+
+int main()
 {
 
-    int processs_id = 0;
+    init_resources();
 
-    Memory memory;
-    memory.number_of_populated_cells = 0;
+    ProcessNeededInformation p1;
+    ProcessNeededInformation p2;
 
-    add_process(&memory, "program.txt", processs_id, 0);
-    print_mem(&memory);
+    Pair p = {"pc", "1"};
+    Pair pp = {"start_of_variables_section", "1"};
+    Pair ppp = {"state", "Ready"};
+    Pair pppp = {"priority", "1"};
+
+    Pair b = {"pc", "2"};
+    Pair bb = {"start_of_variables_section", "2"};
+    Pair bbb = {"state", "Ready"};
+    Pair bbbb = {"priority", "2"};
+
+    p1.arrival_time = 1;
+    p1.number_of_instructions = 2;
+    p1.pc = &p;
+    p1.pid = 4;
+    p1.priority = &pppp;
+    p1.start_of_variables_section = &pp;
+    p1.state = &ppp;
+
+    p2.arrival_time = 3;
+    p2.number_of_instructions = 2;
+    p2.pc = &b;
+    p2.pid = 1;
+    p2.priority = &bbbb;
+    p2.start_of_variables_section = &bb;
+    p2.state = &bbb;
+
+    // queue *q;
+    // q = malloc(sizeof q);
+    // create(q);
+
+    // enqueue(q, &p1);
+    // enqueue(q, &p2);
+
+        // printf("%i", to_int(dequeue(q)->priority->value));
+
+    // semWaitFile(&p1);
+
+    // semWaitFile(&p2);
+
+    // semSignalFile(&p1);
+
+    return 0;
 }
