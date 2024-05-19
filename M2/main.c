@@ -168,12 +168,12 @@ typedef struct
 {
     ProcessNeededInformation *processes[100]; // Array to hold processes in the queue
     int count;                                // Number of processes in the queue
-} Queue;
+} SchedulingQueue;
 
 typedef struct
 {
-    Queue level_queues[NUM_QUEUES];
-    Queue ready_queue;
+    SchedulingQueue level_queues[NUM_QUEUES];
+    SchedulingQueue ready_queue;
     ProcessNeededInformation *running_process;
     int quantum;
 } MLFQ;
@@ -222,7 +222,7 @@ void print_MLFQ()
     printf("--------------------------------------------------------------------------------\n");
 }
 
-ProcessNeededInformation *dequeue(Queue *queue)
+ProcessNeededInformation *dequeue(SchedulingQueue *queue)
 {
     if (queue->count == 0)
         return NULL;
@@ -235,7 +235,7 @@ ProcessNeededInformation *dequeue(Queue *queue)
     return process;
 }
 
-void enqueue(Queue *queue, ProcessNeededInformation *process)
+void enqueue(SchedulingQueue *queue, ProcessNeededInformation *process)
 {
     queue->processes[queue->count++] = process;
 }
