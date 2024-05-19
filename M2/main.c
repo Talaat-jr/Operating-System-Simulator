@@ -222,7 +222,7 @@ void print_MLFQ()
     printf("--------------------------------------------------------------------------------\n");
 }
 
-ProcessNeededInformation *dequeue(SchedulingQueue *queue)
+ProcessNeededInformation *scheduling_dequeue(SchedulingQueue *queue)
 {
     if (queue->count == 0)
         return NULL;
@@ -235,14 +235,14 @@ ProcessNeededInformation *dequeue(SchedulingQueue *queue)
     return process;
 }
 
-void enqueue(SchedulingQueue *queue, ProcessNeededInformation *process)
+void scheduling_enqueue(SchedulingQueue *queue, ProcessNeededInformation *process)
 {
     queue->processes[queue->count++] = process;
 }
 
 void push_to_ready_queue(ProcessNeededInformation *process)
 {
-    enqueue(&(scheduler_queue.ready_queue), process);
+    scheduling_enqueue(&(scheduler_queue.ready_queue), process);
 }
 
 void add_ready_processes()
@@ -250,9 +250,9 @@ void add_ready_processes()
     int ready_queue_size = scheduler_queue.ready_queue.count;
     for (int i = 0; i < ready_queue_size; i++)
     {
-        ProcessNeededInformation *process = dequeue(&(scheduler_queue.ready_queue));
+        ProcessNeededInformation *process = scheduling_dequeue(&(scheduler_queue.ready_queue));
         int priority_level = to_int(process->priority->value);
-        enqueue(&(scheduler_queue.level_queues[priority_level]), process);
+        scheduling_enqueue(&(scheduler_queue.level_queues[priority_level]), process);
     }
 }
 
@@ -263,7 +263,7 @@ ProcessNeededInformation *get_highest_priority_process(int *quantum)
         if (scheduler_queue.level_queues[i].count > 0)
         {
             *quantum = (1 << i) - 1; // -1 to consider that this process is going to be executed atleast once after being pulled
-            return dequeue(&(scheduler_queue.level_queues[i]));
+            return scheduling_dequeue(&(scheduler_queue.level_queues[i]));
         }
     }
     *quantum = 0;
@@ -287,7 +287,7 @@ ProcessNeededInformation *pull_executable_process()
             priority_level++;
             scheduler_queue.running_process->priority->value = to_string(priority_level);
         }
-        enqueue(&(scheduler_queue.level_queues[priority_level]), scheduler_queue.running_process);
+        scheduling_enqueue(&(scheduler_queue.level_queues[priority_level]), scheduler_queue.running_process);
     }
     else
     {
