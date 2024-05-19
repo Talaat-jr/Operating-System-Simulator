@@ -5,8 +5,6 @@
 #define NUM_VARIABLES_PER_PROCESS 3
 #define NUM_QUEUES 4
 
-// globally defined to be automatically initialized
-
 char **read_program(const char *filename, int *num_lines)
 {
     FILE *file = fopen(filename, "r");
@@ -69,7 +67,7 @@ char **read_program(const char *filename, int *num_lines)
     return lines;
 }
 
-char **split_instruction(const char *str, int *num_words)
+char **split_instruction(char *str, int *num_words)
 {
     char **words;
     int max_words = 16;
@@ -123,12 +121,11 @@ char **split_instruction(const char *str, int *num_words)
     return words;
 }
 
-void clear_buffer(const char **buffer, int *num_items)
+void clear_buffer(char **buffer, int num_items)
 {
     for (int j = 0; j < num_items; j++)
-    {
         free(buffer[j]);
-    }
+
     free(buffer);
 }
 
@@ -161,11 +158,10 @@ typedef struct
     int arrival_time;
     int number_of_instructions;
     Pair *pid;
-    Pair *pc;
     Pair *state;
     Pair *priority;
+    Pair *pc;
     Pair *start_of_variables_section;
-    Pair *upper_bound;
 } ProcessNeededInformation;
 
 typedef struct
@@ -182,8 +178,49 @@ typedef struct
     int quantum;
 } MLFQ;
 
+// globally defined to be automatically initialized
 Memory memory;
 MLFQ scheduler_queue;
+
+void print_PNI(ProcessNeededInformation *process)
+{
+    printf("Process ID : %s\n", process->pid->value);
+    printf("Priority: %s\n", process->priority->value);
+    printf("State: %s\n", process->state->value);
+    printf("PC: %s\n", process->pc->value);
+    printf("Arrival Time: %i\n", process->arrival_time);
+}
+
+void print_MLFQ()
+{
+    printf("----------------------------------- Ready Queue ---------------------------------\n");
+    for (int i = 0; i < scheduler_queue.ready_queue.count; i++)
+    {
+        print_PNI(scheduler_queue.ready_queue.processes[i]);
+    }
+    printf("--------------------------------------------------------------------------------\n");
+
+    for (int i = 0; i < NUM_QUEUES; i++)
+    {
+        printf("----------------------------------- Queue %d ---------------------------------\n", i);
+        if (scheduler_queue.level_queues[i].count > 0)
+        {
+            int const count = scheduler_queue.level_queues[i].count;
+            for (int j = 0; j < count; j++)
+            {
+                print_PNI(scheduler_queue.level_queues[i].processes[j]);
+            }
+        }
+        printf("--------------------------------------------------------------------------------\n");
+    }
+    printf("------------------------------------- Running Process -------------------------------\n");
+    if (scheduler_queue.running_process != NULL)
+    {
+        print_PNI(scheduler_queue.running_process);
+    }
+    printf("Quantum : %i\n", scheduler_queue.quantum);
+    printf("--------------------------------------------------------------------------------\n");
+}
 
 ProcessNeededInformation *dequeue(Queue *queue)
 {
@@ -225,7 +262,7 @@ ProcessNeededInformation *get_highest_priority_process(int *quantum)
     {
         if (scheduler_queue.level_queues[i].count > 0)
         {
-            *quantum = 1 << i;
+            *quantum = (1 << i) - 1; // -1 to consider that this process is going to be executed atleast once after being pulled
             return dequeue(&(scheduler_queue.level_queues[i]));
         }
     }
@@ -236,102 +273,43 @@ ProcessNeededInformation *get_highest_priority_process(int *quantum)
 ProcessNeededInformation *pull_executable_process()
 {
     add_ready_processes();
-    int pc_val;
-    int upper_bound;
-    if (scheduler_queue.quantum == 0)
-    {
-        if (scheduler_queue.running_process != NULL)
-        {
-            pc_val = to_int((scheduler_queue.running_process->pc->value));
-            upper_bound = to_int((scheduler_queue.running_process->upper_bound->value));
-            if(pc_val <= upper_bound){
-                int priority_level = to_int(scheduler_queue.running_process->priority->value);
-                if(priority_level < 3){
-                    scheduler_queue.running_process->priority->value = to_string(to_int(scheduler_queue.running_process->priority->value) + 1);
-                    priority_level++;
-                }    
-                enqueue(&(scheduler_queue.level_queues[priority_level]), scheduler_queue.running_process);
-            }
-        }
+    if (scheduler_queue.running_process == NULL)
+        return scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
 
-        scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
-        scheduler_queue.quantum--;
-        return scheduler_queue.running_process;
+    if (scheduler_queue.running_process->number_of_instructions <= 0)
+        scheduler_queue.running_process->state->value = "Terminated";
+
+    else if (scheduler_queue.quantum == 0)
+    {
+        int priority_level = to_int(scheduler_queue.running_process->priority->value);
+        if (priority_level < 3)
+        {
+            priority_level++;
+            scheduler_queue.running_process->priority->value = to_string(priority_level);
+        }
+        enqueue(&(scheduler_queue.level_queues[priority_level]), scheduler_queue.running_process);
     }
     else
     {
-        pc_val = to_int((scheduler_queue.running_process->pc->value));
-        upper_bound = to_int((scheduler_queue.running_process->upper_bound->value));
-        if(pc_val > upper_bound){
-            scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
-            scheduler_queue.quantum--;
-            return scheduler_queue.running_process;
-        }
         if (strcmp(scheduler_queue.running_process->state->value, "Blocked") == 0)
-        {
             print_PNI(scheduler_queue.running_process);
-            scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
-            scheduler_queue.quantum--;
-            return scheduler_queue.running_process;
-        }
+
         else
         {
             scheduler_queue.quantum--;
+            return scheduler_queue.running_process;
         }
     }
+    return scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
 }
 
-void print_PNI(ProcessNeededInformation *process)
-{
-    printf("Process ID : %s\n", process->pid->value);
-    printf("Priority: %s\n", process->priority->value);
-    printf("State: %s\n", process->state->value);
-    printf("PC: %s\n", process->pc->value);
-    printf("Upper Bound: %s\n", process->upper_bound->value);
-}
-
-void print_MLFQ()
-{
-    printf("----------------------------------- Ready Queue ---------------------------------\n");
-    for (int i = 0; i < scheduler_queue.ready_queue.count; i++)
-    {
-        print_PNI(scheduler_queue.ready_queue.processes[i]);
-    }
-    printf("--------------------------------------------------------------------------------\n");
-
-    for (int i = 0; i < NUM_QUEUES; i++)
-    {
-        printf("----------------------------------- Queue %d ---------------------------------\n", i);
-        if (scheduler_queue.level_queues[i].count > 0)
-        {
-            int const count = scheduler_queue.level_queues[i].count;
-            for (int j = 0; j < count; j++)
-            {
-                print_PNI(scheduler_queue.level_queues[i].processes[j]);
-            }
-        }
-        printf("--------------------------------------------------------------------------------\n");
-    }
-    printf("------------------------------------- Running Process -------------------------------\n");
-    if (scheduler_queue.running_process != NULL)
-    {
-        print_PNI(scheduler_queue.running_process);
-    }
-    printf("Quantum : %i\n" ,scheduler_queue.quantum);
-    printf("--------------------------------------------------------------------------------\n");
-}
-
-void init_PCB(int process_id, ProcessNeededInformation *process)
+void init_PCB(int process_id, ProcessNeededInformation *pni)
 {
 
-    process->pid = &memory.cells[(memory.number_of_populated_cells)];
-    process->state = &memory.cells[(memory.number_of_populated_cells) + 1];
-    process->priority = &memory.cells[(memory.number_of_populated_cells) + 2];
-    process->pc = &memory.cells[(memory.number_of_populated_cells) + 3];
-    process->upper_bound = &memory.cells[(memory.number_of_populated_cells) + 5];
-    // process->state = malloc(sizeof(Pair));
-    // process->state->name = "State";
-    // process->state->value = "Ready";
+    pni->pid = &memory.cells[(memory.number_of_populated_cells)];
+    pni->state = &memory.cells[(memory.number_of_populated_cells) + 1];
+    pni->priority = &memory.cells[(memory.number_of_populated_cells) + 2];
+    pni->pc = &memory.cells[(memory.number_of_populated_cells) + 3];
 
     Pair pcb[PCB_SIZE] =
         {
@@ -344,26 +322,29 @@ void init_PCB(int process_id, ProcessNeededInformation *process)
 
     for (int i = 0; i < PCB_SIZE; i++)
         memory.cells[(memory.number_of_populated_cells)++] = pcb[i];
-    
 }
 
-void init_variables_section()
+void init_variables_section(ProcessNeededInformation *pni)
 {
+    pni->start_of_variables_section = &memory.cells[(memory.number_of_populated_cells)];
+
     for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
         (memory.number_of_populated_cells)++;
 }
 
-void init_process_instructoins(char *program_file_path)
+void init_process_instructoins(char *program_file_path, ProcessNeededInformation *pni)
 {
     int num_lines;
     char **lines = read_program(program_file_path, &num_lines);
-    const int upper_bound_index = (memory.number_of_populated_cells) - 4;
-    memory.cells[upper_bound_index].value = to_string((memory.number_of_populated_cells) + num_lines - 1);
     if (lines == NULL)
     {
         printf("Error reading program file\n");
         return;
     }
+
+    const int upper_bound_index = (memory.number_of_populated_cells) - 4;
+    memory.cells[upper_bound_index].value = to_string((memory.number_of_populated_cells) + num_lines - 1);
+    pni->number_of_instructions = num_lines;
 
     for (int i = 0; i < num_lines; i++)
     {
@@ -380,32 +361,38 @@ void init_process_instructoins(char *program_file_path)
 
 void add_process(char *program_file_path, int process_id, int clk)
 {
-    ProcessNeededInformation *p = malloc(sizeof(ProcessNeededInformation));
-    init_PCB(process_id, p);
-    init_variables_section(memory);
-    init_process_instructoins(program_file_path);
-    push_to_ready_queue(p);
+    ProcessNeededInformation *pni = malloc(sizeof(ProcessNeededInformation));
+    pni->arrival_time = clk;
+
+    init_PCB(process_id, pni);
+    init_variables_section(pni);
+    init_process_instructoins(program_file_path, pni);
+
+    push_to_ready_queue(pni);
 }
 
 void print_mem()
 {
     for (int i = 0; i < 60; i++)
-    {
         printf("%s: %s\n", (memory.cells[i]).name, (memory.cells[i]).value);
-    }
 }
 
 void main()
 {
-
     add_process("Program_1.txt", 0, 0);
     pull_executable_process();
+    add_process("Program_3.txt", 1, 2);
     pull_executable_process();
+    pull_executable_process();
+
+    // Testing the case of a process that has been blocked
+    // scheduler_queue.running_process->state->value = "Blocked";
     // pull_executable_process();
-    // add_process("Program_3.txt" , 2, 0);
-    scheduler_queue.running_process->state->value = "Blocked";
-    add_process("Program_2.txt", 1, 0);
-    pull_executable_process();
+
+    // Testing the case of a process that has been terminated
+    //  scheduler_queue.running_process->number_of_instructions = 0;
+    //  pull_executable_process();
+
     print_MLFQ();
     print_mem();
 }
