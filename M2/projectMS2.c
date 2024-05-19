@@ -251,23 +251,35 @@ void print_mem(Memory *memory)
     }
 }
 
-void WriteFile(const char *filename, const char *data)
+void WriteFile(ProcessNeededInformation * p, const char *file_name, const char *variable_name)
 {
     FILE *file;
-    FILE *file2 = fopen(filename, "r");
+    FILE *file2 = fopen(file_name, "r");
     if (file2 != NULL)
     {
         printf("This file already exist\n");
         return NULL;
     }
 
-    file = fopen(filename, "w");
+    //TODO: should I check if file already exists??
+
+    file = fopen(file_name, "w");
     if (file == NULL)
     {
-        return; // file could not be opened/created
+        printf("Error opening file\n");
+        return;
     }
 
-    fprintf(file, "%s", data);
+    for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
+    {
+        if (strcmp(memory.cells[(p.start_of_variables_section.value) + i].name, variable_name) == 0)
+        {
+            fprintf(file, "%s", memory.cells[(p.start_of_variables_section.value) + i].value);
+            break;
+        }
+    }
+
+    //TODO: should I check if variable already exists??
 
     fclose(file);
     return; // file written successfully
@@ -519,26 +531,6 @@ int semSignaluserOutput(ProcessNeededInformation *p)
     }
 }
 
-char *takeInput()
-{
-    printf("Enter a value: ");
-    char str[100];
-    scanf(" %[^\n]", str); // Fixing the scanf format string
-
-    // Allocate memory dynamically for the input string
-    char *result = malloc(strlen(str) + 1);
-    if (result != NULL)
-    {
-        strcpy(result, str); // Copy the input to the allocated memory
-    }
-    return result;
-}
-
-void printOutput(char *x)
-{
-    printf("%s", x);
-    return;
-}
 
 int main()
 {
