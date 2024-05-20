@@ -301,7 +301,7 @@ ProcessNeededInformation *dequeue(Queue *q)
 
     for (int i = 0; i < q->count; i++)
     {
-        if(isempty(q))
+        if (isempty(q))
         {
             printf("Queue is empty");
             return NULL;
@@ -341,10 +341,10 @@ ProcessNeededInformation *dequeue_element(Queue *q, ProcessNeededInformation *p)
         return NULL;
     }
 
-    for(int i = 0; i < q->count; i++)
+    for (int i = 0; i < q->count; i++)
     {
         ProcessNeededInformation *temp = dequeuehelper(q);
-        if(temp->pid->value == p->pid->value)
+        if (temp->pid->value == p->pid->value)
         {
             return temp;
         }
@@ -393,7 +393,7 @@ int semSignalFile(ProcessNeededInformation *p)
             printf("process: %s unlocked the file resource sucessfully. \n", p->pid->value);
             ProcessNeededInformation *temp;
             temp = dequeue(file_mutex.file_Blocked_Queue);
-            dequeue_element(general_queue,temp);
+            dequeue_element(general_queue, temp);
             push_to_ready_queue(temp);
             file_mutex.Process_using = to_int(temp->pid->value);
             temp->state->value = "Ready";
@@ -441,7 +441,7 @@ int semSignaluserInput(ProcessNeededInformation *p)
             printf("process: %s unlocked sucessfully.", p->pid->value);
             ProcessNeededInformation *temp;
             temp = dequeue(userInput_mutex.userInput_Blocked_Queue);
-            dequeue_element(general_queue,temp);
+            dequeue_element(general_queue, temp);
             push_to_ready_queue(temp);
             userInput_mutex.Process_using = to_int(temp->pid->value);
             temp->state->value = "Ready";
@@ -491,7 +491,7 @@ int semSignaluserOutput(ProcessNeededInformation *p)
             printf("process: %s unlocked sucessfully.", p->pid->value);
             ProcessNeededInformation *temp;
             temp = dequeue(userOutput_mutex.userOutput_Blocked_Queue);
-            dequeue_element(general_queue,temp);
+            dequeue_element(general_queue, temp);
             push_to_ready_queue(temp);
             userOutput_mutex.Process_using = to_int(temp->pid->value);
             temp->state->value = "Ready";
@@ -550,7 +550,7 @@ void print_from_to(ProcessNeededInformation *p, char *variable_name1, char *vari
     for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
     {
         Pair *current_variable = (p->start_of_variables_section + i);
-        if(current_variable->name == NULL)
+        if (current_variable->name == NULL)
             continue;
         if (strcmp(current_variable->name, variable_name1) == 0)
         {
@@ -575,7 +575,7 @@ void assign(ProcessNeededInformation *p, char *variable_name, char *value)
     // TODO: check if the var
     char *temp = malloc(10 * sizeof(char));
     strcpy(temp, variable_name);
-    
+
     for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
     {
         Pair *current_variable = (p->start_of_variables_section + i);
@@ -595,11 +595,11 @@ void assign(ProcessNeededInformation *p, char *variable_name, char *value)
 
 void writeFile(ProcessNeededInformation *p, char *file_name, char *variable_name)
 {
-     
+
     for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
     {
         Pair *current_variable = (p->start_of_variables_section + i);
-        if(current_variable->name == NULL)
+        if (current_variable->name == NULL)
             continue;
         if (strcmp(current_variable->name, file_name) == 0)
         {
@@ -821,16 +821,16 @@ void print_PNI(ProcessNeededInformation *process)
 
 void print_MLFQ()
 {
-    printf("----------------------------------- Ready Queue ---------------------------------\n");
+
+    printf("******************************************************** Ready Queue ********************************************************\n");
     for (int i = 0; i < scheduler_queue.ready_queue.count; i++)
     {
         print_PNI(scheduler_queue.ready_queue.processes[i]);
     }
-    printf("--------------------------------------------------------------------------------\n");
 
     for (int i = 0; i < NUM_QUEUES; i++)
     {
-        printf("----------------------------------- Queue %d ---------------------------------\n", i);
+        printf("********************************************************** Queue %d **********************************************************\n", i);
         if (scheduler_queue.level_queues[i].count > 0)
         {
             int const count = scheduler_queue.level_queues[i].count;
@@ -839,15 +839,15 @@ void print_MLFQ()
                 print_PNI(scheduler_queue.level_queues[i].processes[j]);
             }
         }
-        printf("--------------------------------------------------------------------------------\n");
+        printf("*****************************************************************************************************************************\n");
     }
-    printf("------------------------------------- Running Process -------------------------------\n");
+    printf("****************************************************** Running Process ******************************************************\n");
     if (scheduler_queue.running_process != NULL)
     {
         print_PNI(scheduler_queue.running_process);
     }
     printf("Remaining Quantum : %i\n", scheduler_queue.quantum);
-    printf("--------------------------------------------------------------------------------\n");
+    printf("*****************************************************************************************************************************\n");
 }
 
 ProcessNeededInformation *scheduling_dequeue(SchedulingQueue *queue)
@@ -927,7 +927,7 @@ ProcessNeededInformation *pull_executable_process()
             priority_level++;
             scheduler_queue.running_process->priority->value = to_string(priority_level);
         }
-        if(strcmp(scheduler_queue.running_process->state->value, "Blocked") != 0)
+        if (strcmp(scheduler_queue.running_process->state->value, "Blocked") != 0)
             scheduling_enqueue(&(scheduler_queue.level_queues[priority_level]), scheduler_queue.running_process);
     }
     else
@@ -967,8 +967,7 @@ void init_PCB(int process_id, ProcessNeededInformation *pni)
             {"Priority", "0"},
             {"PC", to_string(memory.number_of_populated_cells + 9)},
             {"Lower Bound", to_string(memory.number_of_populated_cells)},
-            {"Upper Bound", to_string(memory.number_of_populated_cells)}
-        };
+            {"Upper Bound", to_string(memory.number_of_populated_cells)}};
 
     for (int i = 0; i < PCB_SIZE; i++)
         memory.cells[(memory.number_of_populated_cells)++] = pcb[i];
@@ -1023,23 +1022,27 @@ void add_process(char *program_file_path, int process_id, int clk)
 
 void print_mem()
 {
-     for (int i = 0; i < 60; i++){
-        printf("Cell %i => %s: %s | ", i , (memory.cells[i]).name, (memory.cells[i]).value);
-        if((i != 0) && (i%6 == 0)) printf("\n");
+    for (int i = 0; i < 60; i++)
+    {
+        printf("Cell %i => %s: %s | ", i, (memory.cells[i]).name, (memory.cells[i]).value);
+        if ((i != 0) && (i % 6 == 0))
+            printf("\n");
     }
-    printf("\n");
+    printf("\n___________________________________________________________________________________________________________________________________________________________________________________________________________\n\n");
 }
 
 void print_general_queue()
 {
-    printf("General Queue: \n");
+    printf("******************************************************* General Queue *******************************************************\n");
+
     for (int i = 0; i < general_queue->count; i++)
     {
         ProcessNeededInformation *temp = dequeuehelper(general_queue);
         print_PNI(temp);
         enqueue(general_queue, temp);
     }
-    printf("--------------------------------------------------------------------------------\n");
+
+    printf("*****************************************************************************************************************************\n");
 }
 
 void main()
@@ -1047,7 +1050,6 @@ void main()
     int pid = 0;
     int clk = 1;
     init_resources();
-
 
     while (1)
     {
