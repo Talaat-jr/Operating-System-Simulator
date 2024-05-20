@@ -4,9 +4,10 @@
 #define PCB_SIZE 6
 #define NUM_VARIABLES_PER_PROCESS 3
 #define NUM_QUEUES 4
-#define STACK_SIZE 2
+#define STACK_SIZE 3
 
 // globally defined to be automatically initialized
+int terminate = 0;
 
 char **read_program(const char *filename, int *num_lines)
 {
@@ -59,8 +60,8 @@ char **read_program(const char *filename, int *num_lines)
             return NULL;
         }
         // removing the new line character
-        if (line[strlen(line) - 1] == '\n')
-            line[strlen(line) - 1] = '\0';
+        if (line[strlen(line) - 2] == '\r')
+            line[strlen(line) - 2] = '\0';
         strcpy(lines[num_allocated_lines], line);
         num_allocated_lines++;
     }
@@ -269,7 +270,7 @@ void enqueue(Queue *q, ProcessNeededInformation *p)
     }
     else
     {
-        q->rear->next = temp;
+        q->rear->next = (struct node *)temp;
         q->rear = temp;
         q->count++;
     }
@@ -280,13 +281,13 @@ ProcessNeededInformation *dequeuehelper(Queue *q)
     if (isempty(q))
     {
         printf("Not possible. Underflow.");
-        return;
+        return NULL;
     }
     node *p;
     p = (node *)malloc(sizeof(node));
     p = q->front;
 
-    q->front = q->front->next;
+    q->front = (node *)(q->front->next);
     q->count--;
 
     ProcessNeededInformation *x = (p->data);
@@ -300,6 +301,11 @@ ProcessNeededInformation *dequeue(Queue *q)
 
     for (int i = 0; i < q->count; i++)
     {
+        if(isempty(q))
+        {
+            printf("Queue is empty");
+            return NULL;
+        }
         temp = dequeuehelper(q);
 
         if (temp == NULL)
@@ -327,6 +333,25 @@ ProcessNeededInformation *dequeue(Queue *q)
     }
 }
 
+ProcessNeededInformation *dequeue_element(Queue *q, ProcessNeededInformation *p)
+{
+    if (isempty(q))
+    {
+        printf("Not possible. Underflow.");
+        return NULL;
+    }
+
+    for(int i = 0; i < q->count; i++)
+    {
+        ProcessNeededInformation *temp = dequeuehelper(q);
+        if(temp->pid->value == p->pid->value)
+        {
+            return temp;
+        }
+        enqueue(q, temp);
+    }
+}
+
 int semWaitFile(ProcessNeededInformation *p)
 {
     if (file_mutex.file_free == 1)
@@ -338,7 +363,7 @@ int semWaitFile(ProcessNeededInformation *p)
     }
     else
     {
-        p->state->value = "blocked";
+        p->state->value = "Blocked";
         enqueue(general_queue, p);
         enqueue(file_mutex.file_Blocked_Queue, p);
         printf("Request rejected, process:%s has been blcoked as process: %i is currently using the file resource \n", p->pid->value, file_mutex.Process_using);
@@ -368,7 +393,8 @@ int semSignalFile(ProcessNeededInformation *p)
             printf("process: %s unlocked the file resource sucessfully. \n", p->pid->value);
             ProcessNeededInformation *temp;
             temp = dequeue(file_mutex.file_Blocked_Queue);
-            // pushToReady(temp);
+            dequeue_element(general_queue,temp);
+            push_to_ready_queue(temp);
             file_mutex.Process_using = to_int(temp->pid->value);
             temp->state->value = "Ready";
             printf("process: %s is currently using the file resource. \n", temp->pid->value);
@@ -387,7 +413,7 @@ int semWaituserInput(ProcessNeededInformation *p)
         return 1;
     }
 
-    p->state->value = "blocked";
+    p->state->value = "Blocked";
     enqueue(general_queue, p);
     enqueue(userInput_mutex.userInput_Blocked_Queue, p);
     printf("Request rejected, process: %s has been blcoked as process: %i is currently using the input resource \n", p->pid->value, userInput_mutex.Process_using);
@@ -415,7 +441,8 @@ int semSignaluserInput(ProcessNeededInformation *p)
             printf("process: %s unlocked sucessfully.", p->pid->value);
             ProcessNeededInformation *temp;
             temp = dequeue(userInput_mutex.userInput_Blocked_Queue);
-            // pushToReady(temp);
+            dequeue_element(general_queue,temp);
+            push_to_ready_queue(temp);
             userInput_mutex.Process_using = to_int(temp->pid->value);
             temp->state->value = "Ready";
             printf("process: %s is currently using the user input resource.", temp->pid->value);
@@ -435,7 +462,7 @@ int semWaituserOutput(ProcessNeededInformation *p)
     }
     else
     {
-        p->state->value = "blocked";
+        p->state->value = "Blocked";
         enqueue(general_queue, p);
         enqueue(userOutput_mutex.userOutput_Blocked_Queue, p);
         printf("Request rejected, process: %s has been blcoked as process: %i is currently using the output resource \n", p->pid->value, userOutput_mutex.Process_using);
@@ -464,7 +491,8 @@ int semSignaluserOutput(ProcessNeededInformation *p)
             printf("process: %s unlocked sucessfully.", p->pid->value);
             ProcessNeededInformation *temp;
             temp = dequeue(userOutput_mutex.userOutput_Blocked_Queue);
-            // pushToReady(temp);
+            dequeue_element(general_queue,temp);
+            push_to_ready_queue(temp);
             userOutput_mutex.Process_using = to_int(temp->pid->value);
             temp->state->value = "Ready";
             printf("process: %s is currently using the user output resource.", temp->pid->value);
@@ -522,13 +550,15 @@ void print_from_to(ProcessNeededInformation *p, char *variable_name1, char *vari
     for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
     {
         Pair *current_variable = (p->start_of_variables_section + i);
+        if(current_variable->name == NULL)
+            continue;
         if (strcmp(current_variable->name, variable_name1) == 0)
         {
-            from = to_int(current_variable->value) + i;
+            from = to_int(current_variable->value);
         }
         if (strcmp(current_variable->name, variable_name2) == 0)
         {
-            to = (current_variable->value) + i;
+            to = to_int(current_variable->value);
         }
     }
 
@@ -543,12 +573,15 @@ void print_from_to(ProcessNeededInformation *p, char *variable_name1, char *vari
 void assign(ProcessNeededInformation *p, char *variable_name, char *value)
 {
     // TODO: check if the var
+    char *temp = malloc(10 * sizeof(char));
+    strcpy(temp, variable_name);
+    
     for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
     {
         Pair *current_variable = (p->start_of_variables_section + i);
         if (current_variable->name == NULL)
         {
-            current_variable->name = variable_name;
+            current_variable->name = temp;
             current_variable->value = value;
             break;
         }
@@ -567,7 +600,7 @@ void writeFile(ProcessNeededInformation *p, char *file_name, char *variable_name
     if (file2 != NULL)
     {
         printf("This file already exist\n");
-        return NULL;
+        return;
     }
 
     // TODO: should I check if file already exists??
@@ -747,6 +780,7 @@ void kernel()
     if (p == NULL)
     {
         printf("No process to execute\n");
+        terminate = 1;
         return;
     }
 
@@ -758,7 +792,7 @@ void kernel()
     p->pc->value = to_string(pc + 1);
     p->number_of_instructions--;
 
-    if (pc == to_int(p->start_of_variables_section->value) + p->number_of_instructions)
+    if (p->number_of_instructions <= 0)
     {
         p->state->value = "terminated";
     }
@@ -856,10 +890,22 @@ ProcessNeededInformation *pull_executable_process()
 {
     add_ready_processes();
     if (scheduler_queue.running_process == NULL)
-        return scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
+    {
+        ProcessNeededInformation *process = get_highest_priority_process(&(scheduler_queue.quantum));
+        if (process != NULL)
+        {
+            printf("Process which will be running:\n");
+            print_PNI(process);
+        }
+        return scheduler_queue.running_process = process;
+    }
 
     if (scheduler_queue.running_process->number_of_instructions <= 0)
+    {
         scheduler_queue.running_process->state->value = "Terminated";
+        printf("Process that has been terminated:\n");
+        print_PNI(scheduler_queue.running_process);
+    }
 
     else if (scheduler_queue.quantum == 0)
     {
@@ -869,20 +915,29 @@ ProcessNeededInformation *pull_executable_process()
             priority_level++;
             scheduler_queue.running_process->priority->value = to_string(priority_level);
         }
-        scheduling_enqueue(&(scheduler_queue.level_queues[priority_level]), scheduler_queue.running_process);
+        if(strcmp(scheduler_queue.running_process->state->value, "Blocked") != 0)
+            scheduling_enqueue(&(scheduler_queue.level_queues[priority_level]), scheduler_queue.running_process);
     }
     else
     {
         if (strcmp(scheduler_queue.running_process->state->value, "Blocked") == 0)
+        {
+            printf("Process that has been blocked:\n");
             print_PNI(scheduler_queue.running_process);
-
+        }
         else
         {
             scheduler_queue.quantum--;
             return scheduler_queue.running_process;
         }
     }
-    return scheduler_queue.running_process = get_highest_priority_process(&(scheduler_queue.quantum));
+    ProcessNeededInformation *process = get_highest_priority_process(&(scheduler_queue.quantum));
+    if (process != NULL)
+    {
+        printf("Process which will be running:\n");
+        print_PNI(process);
+    }
+    return scheduler_queue.running_process = process;
 }
 
 void init_PCB(int process_id, ProcessNeededInformation *pni)
@@ -900,7 +955,8 @@ void init_PCB(int process_id, ProcessNeededInformation *pni)
             {"Priority", "0"},
             {"PC", to_string(memory.number_of_populated_cells + 9)},
             {"Lower Bound", to_string(memory.number_of_populated_cells)},
-            {"Upper Bound", to_string(memory.number_of_populated_cells)}};
+            {"Upper Bound", to_string(memory.number_of_populated_cells)}
+        };
 
     for (int i = 0; i < PCB_SIZE; i++)
         memory.cells[(memory.number_of_populated_cells)++] = pcb[i];
@@ -959,22 +1015,54 @@ void print_mem()
         printf("%s: %s\n", (memory.cells[i]).name, (memory.cells[i]).value);
 }
 
+void print_general_queue()
+{
+    printf("General Queue: \n");
+    for (int i = 0; i < general_queue->count; i++)
+    {
+        ProcessNeededInformation *temp = dequeuehelper(general_queue);
+        print_PNI(temp);
+        enqueue(general_queue, temp);
+    }
+    printf("--------------------------------------------------------------------------------\n");
+}
+
 void main()
 {
-    add_process("Program_1.txt", 0, 0);
-    // pull_executable_process();
-    // add_process("Program_3.txt", 1, 2);
-    // pull_executable_process();
-    // pull_executable_process();
+    int pid = 0;
+    int clk = 1;
+    init_resources();
 
-    // Testing the case of a process that has been blocked
-    // scheduler_queue.running_process->state->value = "Blocked";
-    // pull_executable_process();
 
-    // Testing the case of a process that has been terminated
-    //  scheduler_queue.running_process->number_of_instructions = 0;
-    //  pull_executable_process();
-
-    print_MLFQ();
-    print_mem();
+    while (1)
+    {
+        printf("Clock cycle: %i\n", clk);
+        printf("Do you want to add a process? (y/n): ");
+        char response;
+        scanf(" %c", &response);
+        if (response == 'y')
+        {
+            char program_file_path[100];
+            printf("Enter the program file name: ");
+            scanf(" %s", program_file_path);
+            add_process(program_file_path, pid++, clk);
+        }
+        kernel();
+        print_MLFQ();
+        print_general_queue();
+        print_mem();
+        clk++;
+        if (terminate)
+        {
+            printf("No more processes to execute \n");
+            printf("Do you want to exit? (y/n): ");
+            scanf(" %c", &response);
+            if (response == 'y')
+                break;
+            else
+            {
+                terminate = 0;
+            }
+        }
+    }
 }
