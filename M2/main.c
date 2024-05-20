@@ -642,6 +642,17 @@ void writeFile(ProcessNeededInformation *p, char *file_name, char *variable_name
 
 char *readFile(ProcessNeededInformation *p, char *file_name)
 {
+    for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
+    {
+        Pair *current_variable = (p->start_of_variables_section + i);
+        if (current_variable->name == NULL)
+            continue;
+        if (strcmp(current_variable->name, file_name) == 0)
+        {
+            file_name = current_variable->value;
+        }
+    }
+
     FILE *filePointer;
     char *fileContent;
     long fileSize;
@@ -694,8 +705,7 @@ char *readFile(ProcessNeededInformation *p, char *file_name)
     // Null-terminate the file content
     fileContent[fileSize] = '\0';
 
-    // Clean up
-    free(fileContent);
+    // Close the file
     fclose(filePointer);
 
     return fileContent;
@@ -766,8 +776,8 @@ void execute_instruction(ProcessNeededInformation *p, char *instruction)
     else if (strcmp(words[0], "assign") == 0)
     {
         char *value;
-        int is_file_read = num_words == 4 && strcmp(words[2], "readFile") == 0;
-        int is_input = num_words == 3 && strcmp(words[2], "input") == 0;
+        int is_file_read = ((num_words == 4) && (strcmp(words[2], "readFile") == 0));
+        int is_input = ((num_words == 3) && (strcmp(words[2], "input") == 0));
 
         if (is_file_read)
             value = readFile(p, words[3]);
