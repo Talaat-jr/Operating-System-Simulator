@@ -595,6 +595,18 @@ void assign(ProcessNeededInformation *p, char *variable_name, char *value)
 
 void writeFile(ProcessNeededInformation *p, char *file_name, char *variable_name)
 {
+     
+    for (int i = 0; i < NUM_VARIABLES_PER_PROCESS; i++)
+    {
+        Pair *current_variable = (p->start_of_variables_section + i);
+        if(current_variable->name == NULL)
+            continue;
+        if (strcmp(current_variable->name, file_name) == 0)
+        {
+            file_name = current_variable->value;
+        }
+    }
+
     FILE *file;
     FILE *file2 = fopen(file_name, "r");
     if (file2 != NULL)
@@ -794,7 +806,7 @@ void kernel()
 
     if (p->number_of_instructions <= 0)
     {
-        p->state->value = "terminated";
+        p->state->value = "Terminated";
     }
 }
 
@@ -834,7 +846,7 @@ void print_MLFQ()
     {
         print_PNI(scheduler_queue.running_process);
     }
-    printf("Quantum : %i\n", scheduler_queue.quantum);
+    printf("Remaining Quantum : %i\n", scheduler_queue.quantum);
     printf("--------------------------------------------------------------------------------\n");
 }
 
@@ -903,7 +915,7 @@ ProcessNeededInformation *pull_executable_process()
     if (scheduler_queue.running_process->number_of_instructions <= 0)
     {
         scheduler_queue.running_process->state->value = "Terminated";
-        printf("Process that has been terminated:\n");
+        printf("Process that has been Terminated:\n");
         print_PNI(scheduler_queue.running_process);
     }
 
@@ -1011,8 +1023,11 @@ void add_process(char *program_file_path, int process_id, int clk)
 
 void print_mem()
 {
-    for (int i = 0; i < 60; i++)
-        printf("%s: %s\n", (memory.cells[i]).name, (memory.cells[i]).value);
+     for (int i = 0; i < 60; i++){
+        printf("Cell %i => %s: %s | ", i , (memory.cells[i]).name, (memory.cells[i]).value);
+        if((i != 0) && (i%6 == 0)) printf("\n");
+    }
+    printf("\n");
 }
 
 void print_general_queue()
