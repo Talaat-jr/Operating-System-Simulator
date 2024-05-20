@@ -447,7 +447,7 @@ int semSignaluserInput(ProcessNeededInformation *p)
             push_to_ready_queue(temp);
             userInput_mutex.Process_using = to_int(temp->pid->value);
             temp->state->value = "Ready";
-            printf("process: %s is currently using the user input resource.", temp->pid->value);
+            printf("process: %s is currently using the user input resource.\n", temp->pid->value);
             return 1;
         }
     }
@@ -459,7 +459,7 @@ int semWaituserOutput(ProcessNeededInformation *p)
     {
         userOutput_mutex.Process_using = to_int(p->pid->value);
         userOutput_mutex.userOutput_free = 0;
-        printf("Output resource has been locked suceesfully by process: %s", p->pid->value);
+        printf("Output resource has been locked suceesfully by process: %s\n", p->pid->value);
         return 1;
     }
     else
@@ -497,7 +497,7 @@ int semSignaluserOutput(ProcessNeededInformation *p)
             push_to_ready_queue(temp);
             userOutput_mutex.Process_using = to_int(temp->pid->value);
             temp->state->value = "Ready";
-            printf("process: %s is currently using the user output resource.", temp->pid->value);
+            printf("process: %s is currently using the user output resource.\n", temp->pid->value);
             return 1;
         }
     }
