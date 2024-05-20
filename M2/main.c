@@ -77,6 +77,8 @@ char **split_instruction(char *str, int *num_words)
     int max_words = 16;
     int num_allocated_words = 0;
     char *word;
+    char *strcopy = malloc(100);
+    strcpy(strcopy,str);
 
     words = malloc(max_words * sizeof(char *));
     if (words == NULL)
@@ -85,7 +87,7 @@ char **split_instruction(char *str, int *num_words)
         return NULL;
     }
 
-    word = strtok(str, " \t\n");
+    word = strtok(strcopy, " \t\n");
     while (word != NULL)
     {
         if (num_allocated_words == max_words)
@@ -120,7 +122,7 @@ char **split_instruction(char *str, int *num_words)
         num_allocated_words++;
         word = strtok(NULL, " \t\n");
     }
-
+    free(strcopy);
     *num_words = num_allocated_words;
     return words;
 }
@@ -860,6 +862,49 @@ void print_MLFQ()
     printf("*****************************************************************************************************************************\n");
 }
 
+void print_file_Blocked_Queue(){
+    printf("******************************************************* File Blocked Queue *******************************************************\n");
+
+    for (int i = 0; i < file_mutex.file_Blocked_Queue->count; i++)
+    {
+        ProcessNeededInformation *temp = dequeuehelper(file_mutex.file_Blocked_Queue);
+        print_PNI(temp);
+        enqueue(file_mutex.file_Blocked_Queue, temp);
+    }
+
+    printf("*\n");
+
+}
+
+void print_userInput_Blocked_Queue(){
+    printf("******************************************************* User Input Blocked Queue *******************************************************\n");
+
+    for (int i = 0; i < userInput_mutex.userInput_Blocked_Queue->count; i++)
+    {
+        ProcessNeededInformation *temp = dequeuehelper(userInput_mutex.userInput_Blocked_Queue);
+        print_PNI(temp);
+        enqueue(userInput_mutex.userInput_Blocked_Queue, temp);
+    }
+
+    printf("*\n");
+
+}
+
+void print_userOutput_Blocked_Queue(){
+    printf("******************************************************* User Output Blocked Queue *******************************************************\n");
+
+    for (int i = 0; i < userOutput_mutex.userOutput_Blocked_Queue->count; i++)
+    {
+        ProcessNeededInformation *temp = dequeuehelper(userOutput_mutex.userOutput_Blocked_Queue);
+        print_PNI(temp);
+        enqueue(userOutput_mutex.userOutput_Blocked_Queue, temp);
+    }
+
+    printf("*\n");
+
+
+}
+
 ProcessNeededInformation *scheduling_dequeue(SchedulingQueue *queue)
 {
     if (queue->count == 0)
@@ -1043,7 +1088,7 @@ void print_mem()
 
 void print_general_queue()
 {
-    printf("******************************************************* General Queue *******************************************************\n");
+    printf("******************************************************* General Blocked Queue ***********************************************\n");
 
     for (int i = 0; i < general_queue->count; i++)
     {
@@ -1079,6 +1124,9 @@ void main()
         kernel();
         print_MLFQ();
         print_general_queue();
+        print_file_Blocked_Queue();
+        print_userInput_Blocked_Queue();
+        print_userOutput_Blocked_Queue();
         print_mem();
         clk++;
         if (terminate)
