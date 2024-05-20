@@ -1067,12 +1067,14 @@ void main()
         printf("Do you want to add a process? (y/n): ");
         char response;
         scanf(" %c", &response);
-        if (response == 'y')
+        while (response == 'y')
         {
             char program_file_path[100];
             printf("Enter the program file name: ");
             scanf(" %s", program_file_path);
             add_process(program_file_path, pid++, clk);
+            printf("Do you want to add another process? (y/n): ");
+            scanf(" %c", &response);   
         }
         kernel();
         print_MLFQ();
