@@ -78,7 +78,7 @@ char **split_instruction(char *str, int *num_words)
     int num_allocated_words = 0;
     char *word;
     char *strcopy = malloc(100);
-    strcpy(strcopy,str);
+    strcpy(strcopy, str);
 
     words = malloc(max_words * sizeof(char *));
     if (words == NULL)
@@ -861,9 +861,9 @@ void print_MLFQ()
     printf("Remaining Quantum : %i\n", scheduler_queue.quantum);
     printf("*****************************************************************************************************************************\n");
 }
-
-void print_file_Blocked_Queue(){
-    printf("******************************************************* File Blocked Queue *******************************************************\n");
+void print_file_Blocked_Queue()
+{
+    printf("***************************************************** File Blocked Queue ****************************************************\n");
 
     for (int i = 0; i < file_mutex.file_Blocked_Queue->count; i++)
     {
@@ -872,12 +872,12 @@ void print_file_Blocked_Queue(){
         enqueue(file_mutex.file_Blocked_Queue, temp);
     }
 
-    printf("*\n");
-
+    printf("*****************************************************************************************************************************\n");
 }
 
-void print_userInput_Blocked_Queue(){
-    printf("******************************************************* User Input Blocked Queue *******************************************************\n");
+void print_userInput_Blocked_Queue()
+{
+    printf("************************************************ User Input Blocked Queue ***************************************************\n");
 
     for (int i = 0; i < userInput_mutex.userInput_Blocked_Queue->count; i++)
     {
@@ -886,12 +886,12 @@ void print_userInput_Blocked_Queue(){
         enqueue(userInput_mutex.userInput_Blocked_Queue, temp);
     }
 
-    printf("*\n");
-
+    printf("*****************************************************************************************************************************\n");
 }
 
-void print_userOutput_Blocked_Queue(){
-    printf("******************************************************* User Output Blocked Queue *******************************************************\n");
+void print_userOutput_Blocked_Queue()
+{
+    printf("************************************************ User Output Blocked Queue **************************************************\n");
 
     for (int i = 0; i < userOutput_mutex.userOutput_Blocked_Queue->count; i++)
     {
@@ -900,9 +900,7 @@ void print_userOutput_Blocked_Queue(){
         enqueue(userOutput_mutex.userOutput_Blocked_Queue, temp);
     }
 
-    printf("*\n");
-
-
+    printf("*****************************************************************************************************************************\n");
 }
 
 ProcessNeededInformation *scheduling_dequeue(SchedulingQueue *queue)
@@ -1119,7 +1117,7 @@ void main()
             scanf(" %s", program_file_path);
             add_process(program_file_path, pid++, clk);
             printf("Do you want to add another process? (y/n): ");
-            scanf(" %c", &response);   
+            scanf(" %c", &response);
         }
         kernel();
         print_MLFQ();
